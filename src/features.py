@@ -1,22 +1,9 @@
-"""Turn clean daily prices into the monthly modelling table (the panel).
+"""Seven indicators, two labels and the monthly data table (WBS 2.4).
 
-WBS 2.4.
-
-Pipeline
-    clean daily prices (notebook 01)
-      -> daily_features()     seven indicators for every ticker and day
-      -> build_panel()        one row per universe, ticker and month-end,
-                              with the two labels attached
-      -> validate_panel()     checks, including a look-ahead test
-
-Timing rule used everywhere in this file
-    A row dated t (the last trading day of a month) contains
-      features  computed from prices and volumes on or before day t
-      labels    the return from month-end t to the next month-end t+1
-    So a row can be used for training only once month t+1 has ended.
-
-All price features use adjusted close (adj_close), so dividends and splits
-never look like price moves. Volume uses the raw share count.
+Timing rule: a row dated t (a month-end) holds features computed from
+prices up to t and the return from t to the next month-end. A row can be
+used for training only once that next month-end has passed. All price
+features use adjusted close, so dividends never look like price moves.
 """
 
 import numpy as np
@@ -68,7 +55,7 @@ def _one_ticker_features(df):
     out = pd.DataFrame(index=df.index)
 
     # 1. Momentum: log return over the last 21 trading days (about one month).
-    out["ret_1m"] = np.log(p / p.shift(config.RET_WINDOW))
+    out["momentum"] = np.log(p / p.shift(config.RET_WINDOW))
 
     # 2. Trend: how far the 10-day average sits above the 50-day average.
     #    The paper uses a raw 10-day SMA, which is in dollars and cannot be
@@ -79,19 +66,19 @@ def _one_ticker_features(df):
     out["price_bias"] = p / _sma(p, config.SMA_SHORT) - 1
 
     # 4. RSI(14) with Wilder smoothing.
-    out["rsi14"] = wilder_rsi(p)
+    out["rsi"] = wilder_rsi(p)
 
     # 5. MACD difference (histogram) divided by price to remove the scale.
     macd = _ema(p, config.MACD_FAST) - _ema(p, config.MACD_SLOW)
     signal = macd.ewm(span=config.MACD_SIGNAL, adjust=False,
                       min_periods=config.MACD_SIGNAL).mean()
-    out["macd_diff"] = (macd - signal) / p
+    out["macd"] = (macd - signal) / p
 
     # 6. Bollinger width: band width (mean +/- 2 standard deviations) divided
     #    by the middle band, i.e. 4 * std20 / SMA20. A volatility measure.
     #    Population standard deviation (ddof=0), as in Bollinger's definition.
     std = p.rolling(config.BOLL_WINDOW, min_periods=config.BOLL_WINDOW).std(ddof=0)
-    out["boll_width"] = 4 * std / _sma(p, config.BOLL_WINDOW)
+    out["bollinger"] = 4 * std / _sma(p, config.BOLL_WINDOW)
 
     # 7. Volume bias: today's volume relative to its 10-day average.
     #    Undefined (missing) when today's volume is 0 or unknown, because a
@@ -152,16 +139,12 @@ def _universe_rows(daily, prices_me, ends, universe, tickers):
 
 
 def build_panel(clean, daily=None):
-    """Build the monthly panel for both universes.
+    """Build Monthly Data: one row per universe, ETF and month-end.
 
-    One row per (universe, ticker, month-end). SPY and XLK appear in both
-    universes with identical features but universe-specific labels, because
-    the top 3 is decided among the ETFs of that universe.
-
-    Columns
-        date, universe, ticker, holding_month, sample
-        seven features (+ volume_bias_missing flag)
-        next_return (label A), next_rank, top3_next (label B)
+    SPY and XLK appear in both universes with the same features but their
+    own labels, because the top 3 is decided within each universe.
+    Columns: date, universe, ticker, month, period, the seven features,
+    volume_filled, next_return (label A), next_rank, top3 (label B).
     """
     daily = daily if daily is not None else daily_features(clean)
     ends = month_ends(clean)
@@ -175,32 +158,32 @@ def build_panel(clean, daily=None):
     panel = panel[panel["date"] >= pd.Timestamp(config.PANEL_START)]
 
     # The month whose return the row's label measures.
-    panel.insert(3, "holding_month",
+    panel.insert(3, "month",
                  (panel["date"].dt.to_period("M") + 1).astype(str))
 
     # Label B. Missing where next_rank is missing (the newest month).
     panel["next_rank"] = panel["next_rank"].astype("Int64")
-    panel["top3_next"] = (panel["next_rank"] <= config.TOP_K).astype("Int64")
+    panel["top3"] = (panel["next_rank"] <= config.TOP_K).astype("Int64")
 
     # Missing volume bias: keep a flag and fill with 0, which means "volume
     # at its usual level". The fill uses no future information and lets every
     # model, including ones that cannot handle missing values, use the row.
-    panel["volume_bias_missing"] = panel["volume_bias"].isna()
+    panel["volume_filled"] = panel["volume_bias"].isna()
     panel["volume_bias"] = panel["volume_bias"].fillna(0.0)
 
     # Which part of the experiment each row belongs to.
-    first_test = pd.Period(config.TEST_FIRST_HOLDING, "M")
-    last_test = pd.Period(config.TEST_LAST_HOLDING, "M")
-    hold = pd.PeriodIndex(panel["holding_month"], freq="M")
-    panel["sample"] = np.select(
+    first_test = pd.Period(config.TEST_FIRST_MONTH, "M")
+    last_test = pd.Period(config.TEST_LAST_MONTH, "M")
+    hold = pd.PeriodIndex(panel["month"], freq="M")
+    panel["period"] = np.select(
         [panel["next_return"].isna(), hold < first_test, hold <= last_test],
-        ["unlabeled", "pre_test", "test"],
-        default="after_test",
+        ["latest", "history", "test"],
+        default="after test period",
     )
 
-    order = (["date", "universe", "ticker", "holding_month", "sample"]
-             + config.FEATURES + ["volume_bias_missing",
-                                  "next_return", "next_rank", "top3_next"])
+    order = (["date", "universe", "ticker", "month", "period"]
+             + config.FEATURES + ["volume_filled",
+                                  "next_return", "next_rank", "top3"])
     panel = panel[order].sort_values(["universe", "date", "ticker"])
     return panel.reset_index(drop=True)
 
@@ -233,15 +216,15 @@ def validate_panel(panel, clean, n_truncation_tests=8, seed=0):
     rows.append(_check("features complete", n_na == 0,
                        f"{n_na} missing feature values"))
 
-    rsi_ok = panel["rsi14"].between(0, 100).all()
-    rows.append(_check("rsi14 range", rsi_ok, "all values between 0 and 100"))
-    bw_ok = (panel["boll_width"] > 0).all()
-    rows.append(_check("boll_width range", bw_ok, "all values above 0"))
+    rsi_ok = panel["rsi"].between(0, 100).all()
+    rows.append(_check("rsi range", rsi_ok, "all values between 0 and 100"))
+    bw_ok = (panel["bollinger"] > 0).all()
+    rows.append(_check("bollinger range", bw_ok, "all values above 0"))
     finite = np.isfinite(panel[config.FEATURES].to_numpy()).all()
     rows.append(_check("finite values", finite, "no infinite feature values"))
 
     labeled = panel[panel["next_return"].notna()]
-    per_month = labeled.groupby(["universe", "date"])["top3_next"].sum()
+    per_month = labeled.groupby(["universe", "date"])["top3"].sum()
     rows.append(_check("top-3 per month", (per_month == config.TOP_K).all(),
                        f"exactly {config.TOP_K} positives in all "
                        f"{len(per_month)} universe-months"))
@@ -279,7 +262,7 @@ def validate_panel(panel, clean, n_truncation_tests=8, seed=0):
         full = (panel[(panel["date"] == t)]
                 .drop_duplicates("ticker").set_index("ticker"))
         full_vals = full[config.FEATURES].copy()
-        full_vals.loc[full["volume_bias_missing"], "volume_bias"] = np.nan
+        full_vals.loc[full["volume_filled"], "volume_bias"] = np.nan
         a = cut.loc[full_vals.index].to_numpy(dtype=float)
         b = full_vals.to_numpy(dtype=float)
         if (np.isnan(a) != np.isnan(b)).any():

@@ -1,19 +1,7 @@
-"""Quality checks and cleaning for the frozen price download.
+"""Quality checks and cleaning of the frozen daily prices (WBS 2.3).
 
-WBS 2.3.
-
-Every check writes one row to a report with a status:
-    PASS  nothing to do
-    WARN  something unusual that the cleaning step handles or that you
-          should look at once (for example a large one-day move)
-    FAIL  the data cannot be used as it is; fix before going on
-
-Main functions
-    run_quality_checks()  report on the raw frozen download
-    clean_prices()        aligned, gap-filled table ready for features
-    check_month_ends()    every ticker has a price at every month-end
-    coverage_table()      per-ticker summary for the data collection sheet
-    cross_check()         optional comparison with a second source
+Each check returns PASS, WARN (handled by cleaning, or worth one look) or
+FAIL (the data cannot be used until fixed).
 """
 
 from pathlib import Path
@@ -351,18 +339,17 @@ def cross_check(clean, other_csv, ticker, date_col="Date", price_col="Close"):
     return _row("cross-check", ticker, status, detail)
 
 
-def save_clean(clean, fill_log, processed_dir, reports_dir, version="v1"):
-    """Save the clean table (Parquet for code, CSV for reading) and the fill log."""
+def save_clean(clean, fill_log, processed_dir, reports_dir):
+    """Save Daily Prices (Parquet for code, CSV for reading) and the fill log."""
     processed_dir, reports_dir = Path(processed_dir), Path(reports_dir)
-    parquet_path = processed_dir / f"prices_clean_{version}.parquet"
-    clean.to_parquet(parquet_path, index=False)
-    clean.to_csv(processed_dir / f"prices_clean_{version}.csv", index=False)
-    fill_log.to_csv(reports_dir / f"fill_log_{version}.csv", index=False)
-    print(f"Saved {len(clean):,} rows to {parquet_path}")
-    return parquet_path
+    path = processed_dir / config.FILES["daily"]
+    clean.to_parquet(path, index=False)
+    clean.to_csv(path.with_suffix(".csv"), index=False)
+    fill_log.to_csv(reports_dir / config.FILES["filled"], index=False)
+    print(f"Saved {len(clean):,} rows to {path}")
+    return path
 
 
-def load_clean(processed_dir, version="v1"):
-    """Load the clean daily table. Later notebooks start from here."""
-    path = Path(processed_dir) / f"prices_clean_{version}.parquet"
-    return pd.read_parquet(path)
+def load_clean(processed_dir):
+    """Load Daily Prices. Every later notebook starts here."""
+    return pd.read_parquet(Path(processed_dir) / config.FILES["daily"])

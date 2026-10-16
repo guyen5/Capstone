@@ -1,4 +1,4 @@
-"""Tests for the data pipeline (WBS 2.2 to 3.1) on simulated prices.
+"""Tests for notebooks 1 and 2 on simulated prices.
 
 Run from the repository root:
     python -m pytest tests
@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src import config, dictionary, download, features, quality, walk_forward  # noqa: E402
+from src import cleaning, config, download, features, variables, windows  # noqa: E402
 
 DATES = pd.bdate_range("2009-01-02", "2026-09-30")
 
@@ -72,7 +72,7 @@ def monkeypatch_module():
 
 @pytest.fixture(scope="module")
 def clean(raw):
-    return quality.clean_prices(raw)[0]
+    return cleaning.clean_prices(raw)[0]
 
 
 @pytest.fixture(scope="module")
@@ -86,7 +86,7 @@ def test_download_shape(raw):
 
 
 def test_quality_checks_catch_planted_problems(raw):
-    report = quality.run_quality_checks(raw)
+    report = cleaning.run_quality_checks(raw)
     warn = report[report["status"] == "WARN"]
     assert ("missing days", "JPXN") in set(zip(warn["check"], warn["ticker"]))
     assert ("zero volume", "JPXN") in set(zip(warn["check"], warn["ticker"]))
@@ -127,12 +127,12 @@ def test_features_match_hand_calculation(clean):
     macd = ema(x, 12) - ema(x, 26)
 
     hand = {
-        "ret_1m": np.log(p.iloc[i] / p.iloc[i - 21]),
+        "momentum": np.log(p.iloc[i] / p.iloc[i - 21]),
         "trend": p.iloc[i - 9:i + 1].mean() / p.iloc[i - 49:i + 1].mean() - 1,
         "price_bias": p.iloc[i] / p.iloc[i - 9:i + 1].mean() - 1,
-        "rsi14": 100 - 100 / (1 + ag / al),
-        "macd_diff": (macd[-1] - ema(macd, 9)[-1]) / x[-1],
-        "boll_width": 4 * p.iloc[i - 19:i + 1].std(ddof=0) / p.iloc[i - 19:i + 1].mean(),
+        "rsi": 100 - 100 / (1 + ag / al),
+        "macd": (macd[-1] - ema(macd, 9)[-1]) / x[-1],
+        "bollinger": 4 * p.iloc[i - 19:i + 1].std(ddof=0) / p.iloc[i - 19:i + 1].mean(),
         "volume_bias": v.iloc[i] / v.iloc[i - 9:i + 1].mean() - 1,
     }
     for name, value in hand.items():
@@ -142,8 +142,8 @@ def test_features_match_hand_calculation(clean):
 def test_panel_passes_all_checks(panel, clean):
     report = features.validate_panel(panel, clean)
     assert (report["status"] == "PASS").all(), report[report["status"] != "PASS"]
-    assert (dictionary.check_table(panel, "monthly_panel_v1")["status"] == "PASS").all()
-    assert (dictionary.check_table(clean, "prices_clean_v1")["status"] == "PASS").all()
+    assert (variables.check_table(panel, "Monthly Data")["status"] == "PASS").all()
+    assert (variables.check_table(clean, "Daily Prices")["status"] == "PASS").all()
 
 
 def test_zero_volume_month_end_is_flagged(clean):
@@ -152,12 +152,27 @@ def test_zero_volume_month_end_is_flagged(clean):
     c.loc[(c["ticker"] == "JPXN") & (c["date"] == d), "volume"] = 0
     p = features.build_panel(c)
     row = p[(p["ticker"] == "JPXN") & (p["date"] == d)].iloc[0]
-    assert row["volume_bias"] == 0 and row["volume_bias_missing"]
+    assert row["volume_bias"] == 0 and row["volume_filled"]
 
 
-def test_walk_forward_calendar(panel):
+def test_training_windows(panel):
     for window in ["growing", *config.ROLLING_WINDOWS]:
-        cal = walk_forward.walk_forward_calendar(panel, window)
+        cal = windows.training_windows(panel, window)
         assert len(cal) == 81
-        assert (walk_forward.check_calendar(cal, panel)["status"] == "PASS").all()
-        assert (dictionary.check_table(cal, "walk_forward_calendar")["status"] == "PASS").all()
+        assert (windows.check_windows(cal, panel)["status"] == "PASS").all()
+        assert (variables.check_table(cal, "Training Windows")["status"] == "PASS").all()
+
+
+def test_old_file_names_are_renamed(raw, tmp_path):
+    import json
+    dirs = config.data_dirs(tmp_path)
+    csv_path, info_path = download.freeze(raw, dirs["raw"])
+    csv_path.rename(dirs["raw"] / "prices_raw_20261016.csv")
+    info_path.rename(dirs["raw"] / "freeze_20261016.json")
+    (dirs["processed"] / "monthly_panel_v1.parquet").write_text("old")
+    download.rename_old_files(dirs)
+    loaded, info = download.load_frozen(dirs["raw"])
+    assert len(loaded) == len(raw) and info["file"] == config.FILES["raw"]
+    assert (dirs["archive"] / "monthly_panel_v1.parquet").exists()
+    assert not list(dirs["raw"].glob("freeze_*.json"))
+    download.rename_old_files(dirs)  # second run changes nothing
