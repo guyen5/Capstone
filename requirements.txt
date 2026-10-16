@@ -1,0 +1,7 @@
+# Libraries for the capstone notebooks. Colab already has most of them;
+# yfinance is pinned so every download uses the same code.
+yfinance==1.7.0
+pandas>=2.1
+numpy>=1.26
+pyarrow>=14
+matplotlib>=3.8
