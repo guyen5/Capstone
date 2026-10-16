@@ -10,7 +10,7 @@ to predict next month's returns. Builds on Wang and Hasuike (2026), arXiv 2605.0
 
 | What | Where |
 |---|---|
-| Code (`src/`) and notebooks (`notebooks/`) | This repository |
+| Code (`src/`) and notebooks (repo root) | This repository |
 | Data (raw downloads, clean tables, reports) | Google Drive, `MyDrive/Capstone/data/` |
 | Running the notebooks | Google Colab |
 
@@ -18,7 +18,7 @@ Data is never committed here (see `.gitignore`).
 
 ## Reproduce
 
-1. Open `notebooks/01_data_pull_and_freeze.ipynb` in Colab (File, Open notebook, GitHub tab, `guyen5/Capstone`).
+1. Open `01_data_pull_and_freeze.ipynb` in Colab (File, Open notebook, GitHub tab, `guyen5/Capstone`).
 2. Run all cells. The first cell mounts Drive, clones this repository and installs `requirements.txt`.
 3. Later notebooks start from `data/processed/prices_clean_v1.parquet`.
 
