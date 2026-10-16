@@ -1,5 +1,7 @@
 """Download daily ETF prices from Yahoo Finance and freeze them on Drive.
 
+WBS 2.2.
+
 The workflow is: download once, freeze once, and from then on load only the
 frozen file. Yahoo recalculates adjusted prices every time a fund pays a
 dividend, so two downloads made on different days never match exactly.

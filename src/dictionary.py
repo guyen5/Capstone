@@ -1,5 +1,7 @@
 """Data dictionary: one entry per column of every table the project saves.
 
+WBS 2.5.
+
 This file is the single source of truth for what each variable means. The
 notebooks check every saved table against it (check_table), so the
 dictionary cannot drift away from the code. The written data dictionary
@@ -39,30 +41,30 @@ ENTRIES = [
        "ETF symbol, one of the 16 tickers in config.ALL_TICKERS.",
        code="quality.clean_prices"),
     _v(D, "open", "float", "USD", "raw", "First traded price of the day, not adjusted.",
-       lo=0, code="data_pull.download_prices"),
+       lo=0, code="download.download_prices"),
     _v(D, "high", "float", "USD", "raw", "Highest traded price of the day, not adjusted.",
-       lo=0, code="data_pull.download_prices"),
+       lo=0, code="download.download_prices"),
     _v(D, "low", "float", "USD", "raw", "Lowest traded price of the day, not adjusted.",
-       lo=0, code="data_pull.download_prices"),
+       lo=0, code="download.download_prices"),
     _v(D, "close", "float", "USD", "raw",
        "Last traded price of the day, not adjusted. Used only in quality checks.",
-       lo=0, code="data_pull.download_prices"),
+       lo=0, code="download.download_prices"),
     _v(D, "adj_close", "float", "USD", "raw",
        "Close adjusted for dividends and splits, so its changes are total returns. "
        "Every return and price feature uses this column.",
-       lo=0, code="data_pull.download_prices"),
+       lo=0, code="download.download_prices"),
     _v(D, "volume", "float", "shares", "raw",
        "Number of shares traded that day.", lo=0,
        missing="only on days filled from the previous day (none in freeze 20261016)",
-       code="data_pull.download_prices"),
+       code="download.download_prices"),
     _v(D, "dividends", "float", "USD per share", "raw",
        "Cash distribution with its ex-date on this day; 0 otherwise.", lo=0,
-       code="data_pull.download_prices"),
+       code="download.download_prices"),
     _v(D, "splits", "float", "ratio", "raw", "Split ratio on split days; 0 otherwise.",
-       lo=0, code="data_pull.download_prices"),
+       lo=0, code="download.download_prices"),
     _v(D, "capital_gains", "float", "USD per share", "raw",
        "Capital gains distribution on this day; 0 otherwise.", lo=0,
-       code="data_pull.download_prices"),
+       code="download.download_prices"),
     _v(D, "filled", "bool", "", "flag",
        "True if the price was copied from the previous trading day.",
        code="quality.clean_prices"),
@@ -131,24 +133,24 @@ ENTRIES = [
 
     # Walk-forward calendar (notebook 02, used from notebook 03 on).
     _v(C, "holding_month", "text", "YYYY-MM", "identifier",
-       "Test month whose return is predicted.", code="splits.walk_forward_calendar"),
+       "Test month whose return is predicted.", code="walk_forward.walk_forward_calendar"),
     _v(C, "decision_date", "date", "month-end", "identifier",
        "Month-end t when the model is refit and predicts.",
-       code="splits.walk_forward_calendar"),
+       code="walk_forward.walk_forward_calendar"),
     _v(C, "train_start", "date", "month-end", "split",
-       "First panel date in the training window.", code="splits.walk_forward_calendar"),
+       "First panel date in the training window.", code="walk_forward.walk_forward_calendar"),
     _v(C, "train_end", "date", "month-end", "split",
        "Last panel date in the training window; always before decision_date.",
-       code="splits.walk_forward_calendar"),
+       code="walk_forward.walk_forward_calendar"),
     _v(C, "val_start", "date", "month-end", "split",
        "First date of the 12-month validation slice inside the training window.",
-       code="splits.walk_forward_calendar"),
+       code="walk_forward.walk_forward_calendar"),
     _v(C, "n_train_months", "int", "months", "split",
        "Number of month-ends in the training window, validation included.",
-       lo=1, code="splits.walk_forward_calendar"),
+       lo=1, code="walk_forward.walk_forward_calendar"),
     _v(C, "window", "text", "", "split",
        "growing (primary) or 36 / 60 (rolling robustness windows).",
-       code="splits.walk_forward_calendar"),
+       code="walk_forward.walk_forward_calendar"),
 ]
 
 

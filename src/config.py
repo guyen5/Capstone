@@ -1,5 +1,7 @@
 """Project settings shared by every notebook.
 
+Shared by all work packages.
+
 Every notebook imports its tickers, dates, thresholds and folder paths from
 this file. To change a setting, change it here and nowhere else, so all
 steps of the pipeline always agree with each other.

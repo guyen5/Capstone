@@ -2,60 +2,73 @@
 
 **A walk-forward test of the decision-induced ranking hypothesis on ETF portfolios**
 
-Capstone project, Guyen Tumurbat, Minerva University. Advisor: Prof. Engin Volkan.
+Capstone project, Minerva University, 2026-2027. Advisor: Prof. Engin Volkan.
 
-## Overview
+## The question
 
-Portfolio models built on machine-learning forecasts usually train the model to
-predict returns as accurately as possible. Wang and Hasuike (2026, arXiv
-2605.01176) show that a mean-variance optimizer with transaction costs selects
-assets by the ordering of adjusted scores rather than their magnitudes, and that
-return-trained models therefore inflate their predictions and replace more than
-80% of the portfolio each month. This project tests the implication directly:
-does training the same model to classify which ETFs will rank in next month's
-top three, instead of regressing next month's return, produce better portfolios
-after transaction costs?
+Wang and Hasuike (2026, arXiv 2605.01176) show that a mean-variance optimizer
+with transaction costs picks assets by the *order* of its inputs, not their
+size, and that models trained to predict returns end up replacing over 80% of
+the portfolio every month. This project tests the direct implication: does a
+model trained to **classify which ETFs will be in next month's top 3** build
+better portfolios after fees than the same model trained to **predict next
+month's return**?
 
-Gradient-boosted and linear models are trained both ways in a monthly
-walk-forward backtest on eight ETFs (January 2020 to September 2026, 0.5% fee),
-and the difference in net returns is assessed with block and Bayesian bootstrap
-inference.
+- **H1:** with the same inputs, model and portfolio rule, the classification-trained model earns a higher average monthly return after a 0.5% fee.
+- **H0:** no difference.
+- **Test:** 8 ETFs, monthly walk-forward backtest, January 2020 to September 2026, block and Bayesian bootstrap.
 
-**H1.** With identical inputs, model class and portfolio rule, the
-classification-trained model earns a higher mean monthly net-of-cost return
-than the regression-trained model. **H0.** No difference.
+## Repository map
+
+Files are numbered by the work package (WBS) they deliver. The WBS itself is
+the Google Sheet "Capstone WBS".
+
+```
+Capstone/
+├── README.md                              this page
+├── requirements.txt                       libraries Colab installs
+├── notebooks/                             run these in Colab, in order
+│   ├── 2.2_download_and_quality.ipynb       WBS 2.2-2.3  download, freeze, check, clean
+│   └── 2.4_features_and_panel.ipynb         WBS 2.4-2.5, 3.1  features, labels, panel, calendar
+├── src/                                   code the notebooks import
+│   ├── config.py                            every setting in one place
+│   ├── download.py                          WBS 2.2  Yahoo download, freeze, load
+│   ├── quality.py                           WBS 2.3  quality checks and cleaning
+│   ├── features.py                          WBS 2.4  indicators, labels, monthly panel
+│   ├── dictionary.py                        WBS 2.5  definition of every saved column
+│   └── walk_forward.py                      WBS 3.1  train / validation / test windows
+└── tests/
+    └── test_pipeline.py                     checks the pipeline on simulated prices
+```
+
+Coming next, in WBS order: `3.2_backtest_engine`, `4_models`,
+`5_hypothesis_test`, `6_robustness`.
 
 ## Where things live
 
 | What | Where |
 |---|---|
-| Code (`src/`) and notebooks (repo root) | This repository |
-| Data (raw downloads, clean tables, reports) | Google Drive, `MyDrive/Capstone/data/` |
-| Running the notebooks | Google Colab |
+| Code and notebooks | This repository |
+| Data | Google Drive, `MyDrive/Capstone/data/` (`raw/`, `processed/`, `reports/`) |
+| Plan and progress | Google Sheet "Capstone WBS" |
+| Data definitions | Google Doc "Capstone Data Specification" |
 
-Data is never committed here (see `.gitignore`).
+Data never goes into this repository (see `.gitignore`).
 
-## Reproduce
+## How to run
 
-1. Open a notebook in Colab: File, Open notebook, GitHub tab, `guyen5/Capstone`.
-2. Run all cells. The first cell mounts Drive, clones this repository and installs `requirements.txt`.
-3. Run the notebooks in order; each starts from the previous one's output on Drive.
+1. In Colab: File, Open notebook, GitHub tab, `guyen5/Capstone`, pick a notebook.
+2. Runtime, Run all. The first cell mounts Drive, pulls this repository and installs the libraries.
+3. File, Save a copy in GitHub, same path, to keep the outputs.
 
-## Notebooks
+Each notebook reads the previous one's output from Drive, so they run in order
+once and never need to be rerun unless the code changes.
 
-| Notebook | WBS | Input | Output |
-|---|---|---|---|
-| 01_data_pull_and_freeze | 2.2, 2.3 | Yahoo Finance | `raw/prices_raw_YYYYMMDD.csv`, `processed/prices_clean_v1.parquet`, quality report |
-| 02_features_and_panel | 2.4, 2.5, 3.1 | `prices_clean_v1` | `processed/monthly_panel_v1.parquet`, `walk_forward_calendar_v1`, `data_dictionary_v1.csv`, exploration tables |
-| 03_backtest_engine | 3.2 to 3.4 | panel, calendar | next |
+## Current data (freeze of 2026-10-16)
 
-## Code
-
-| Module | Purpose |
-|---|---|
-| `src/config.py` | Every setting: tickers, dates, windows, thresholds, folders |
-| `src/data_pull.py` | Download, freeze with checksum, load |
-| `src/quality.py` | Quality checks and cleaning of daily prices |
-| `src/features.py` | Seven indicators, month-end panel, labels, panel validation |
-| `src/splits.py` | Walk-forward calendar and train / validation / test rows |
-| `src/dictionary.py` | Data dictionary; every saved table is checked against it |
+| Table | Rows | Status |
+|---|---|---|
+| `raw/prices_raw_20261016.csv` | 71,408 (16 ETFs x 4,463 days) | frozen, MD5 80113bee... |
+| `processed/prices_clean_v1.parquet` | 71,408 | 0 FAIL, 1 WARN (JPXN zero volume) |
+| `processed/monthly_panel_v1.parquet` | 3,618 (ETF_A 1,608, ETF_B 2,010) | 29 of 29 checks pass |
+| `processed/walk_forward_calendar_v1.parquet` | 243 (81 test months x 3 windows) | all checks pass |

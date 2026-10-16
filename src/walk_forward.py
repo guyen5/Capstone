@@ -1,5 +1,7 @@
 """Walk-forward calendar: which panel rows train, tune and test each month.
 
+WBS 3.1.
+
 At each decision date t (a month-end in the test period) the model is
 refit and then predicts the returns of the coming month. Only rows whose
 labels are already known at t may be used:

@@ -1,5 +1,7 @@
 """Quality checks and cleaning for the frozen price download.
 
+WBS 2.3.
+
 Every check writes one row to a report with a status:
     PASS  nothing to do
     WARN  something unusual that the cleaning step handles or that you
@@ -20,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from src import config
-from src.data_pull import ACTION_COLUMNS, PRICE_COLUMNS
+from src.download import ACTION_COLUMNS, PRICE_COLUMNS
 
 
 STATUS_ORDER = {"PASS": 0, "WARN": 1, "FAIL": 2}

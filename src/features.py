@@ -1,5 +1,7 @@
 """Turn clean daily prices into the monthly modelling table (the panel).
 
+WBS 2.4.
+
 Pipeline
     clean daily prices (notebook 01)
       -> daily_features()     seven indicators for every ticker and day
