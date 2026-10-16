@@ -39,6 +39,32 @@ STALE_RUN = 5                # flag 5 or more identical closes in a row
 ADJ_RATIO_TOL = 1e-4         # tolerance for Close vs Adj Close ratio changes
 CROSS_CHECK_TOL = 0.001      # 0.1 percentage point on monthly returns
 
+# Monthly modelling table (notebook 02).
+# A row dated t (a month-end) holds features known at t and the return
+# earned while holding from t to the next month-end.
+PANEL_START = "2010-01-01"   # first decision month-end kept in the panel
+TOP_K = 3                    # label B: is the ETF in next month's top 3?
+
+# Feature windows in trading days (section 2.5 of the data specification).
+RET_WINDOW = 21              # 1-month log return
+SMA_SHORT = 10               # short moving average (trend, price bias, volume)
+SMA_LONG = 50                # long moving average (trend)
+RSI_WINDOW = 14              # Wilder RSI
+MACD_FAST, MACD_SLOW, MACD_SIGNAL = 12, 26, 9
+BOLL_WINDOW = 20             # Bollinger band width
+
+# The seven model inputs, in a fixed order used by every notebook.
+FEATURES = ["ret_1m", "trend", "price_bias", "rsi14",
+            "macd_diff", "boll_width", "volume_bias"]
+
+# Walk-forward test period, written as holding months.
+# The first prediction is made at the end of December 2019 and earns the
+# January 2020 return; the last earns the September 2026 return.
+TEST_FIRST_HOLDING = "2020-01"
+TEST_LAST_HOLDING = "2026-09"
+VALIDATION_MONTHS = 12       # last 12 training months are used to tune settings
+ROLLING_WINDOWS = (36, 60)   # robustness: rolling 3 and 5 year windows
+
 # Folders on Google Drive. Colab mounts Drive at /content/drive.
 DRIVE_ROOT = Path("/content/drive/MyDrive/Capstone")
 
