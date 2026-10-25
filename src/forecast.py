@@ -47,10 +47,16 @@ def ridge_fit(x, y, alphas):
     return out
 
 
-def forecast_month(table, step, universe, tickers, alphas=None, target="fwd_return"):
-    """Forecasts for one decision date, with the penalty chosen on validation."""
+def forecast_month(table, step, universe, tickers, alphas=None, target="fwd_return", month_end_only=False):
+    """Forecasts for one decision date, with the penalty chosen on validation.
+
+    month_end_only: fit only the month-end rows of the window (one row per
+    ETF and month) instead of every trading day.
+    """
     alphas = config.RIDGE_ALPHAS if alphas is None else alphas
     fit, val, test = windows.daily_rows_for(table, step, universe)
+    if month_end_only:
+        fit, val = fit[fit["month_end"]], val[val["month_end"]]
 
     x_fit, c, s = _design(fit, tickers)
     x_val, _, _ = _design(val, tickers, c, s)
@@ -66,7 +72,7 @@ def forecast_month(table, step, universe, tickers, alphas=None, target="fwd_retu
     return pred.reindex(tickers), alphas[best], float(mse[best]), len(fit), len(val)
 
 
-def build_forecasts(table, calendar, universe, tickers, alphas=None):
+def build_forecasts(table, calendar, universe, tickers, alphas=None, month_end_only=False):
     """Forecasts for every decision date in a window calendar (one universe).
 
     Returns a long table: date, month, universe, ticker, forecast, alpha,
@@ -74,7 +80,8 @@ def build_forecasts(table, calendar, universe, tickers, alphas=None):
     """
     rows = []
     for _, step in calendar.iterrows():
-        pred, alpha, mse, n_fit, n_val = forecast_month(table, step, universe, tickers, alphas)
+        pred, alpha, mse, n_fit, n_val = forecast_month(table, step, universe, tickers, alphas,
+                                                        month_end_only=month_end_only)
         for t, f in pred.items():
             rows.append({"date": step["decision_date"], "month": step["month"],
                          "universe": universe, "ticker": t, "forecast": float(f),

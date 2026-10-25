@@ -89,6 +89,9 @@ PAPER_LAST_MONTH = "2025-10"
 # 1e6 shrinks the feature coefficients to almost zero.
 RIDGE_ALPHAS = tuple(float(f"{10 ** (k / 2):.3g}") for k in range(-2, 13))
 
+# Fixed ridge penalties for the PTO shrinkage diagnostic (Notebook 4, WBS 3.45).
+PTO_ALPHA_GRID = (0.1, 10.0, 1000.0, 10000.0, 100000.0, 1000000.0)
+
 # Google Drive folders and file names.
 DRIVE_ROOT = Path("/content/drive/MyDrive/Capstone")
 FILES = {
@@ -115,6 +118,7 @@ FILES = {
     "replication_months": "Replication Months.parquet",
     "replication_results": "Replication Results.csv",
     "replication_checks": "Replication Checks.csv",
+    "penalty_diagnostic": "Ridge Penalty Diagnostic.csv",
 }
 
 
