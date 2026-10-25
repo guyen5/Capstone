@@ -64,6 +64,12 @@ COV_DAYS = 220
 COV_RIDGE = 1e-6
 MONTH_DAYS = 21
 
+# Classic Markowitz expected returns: mean daily return over the last
+# MU_DAYS trading days, times 21. The paper does not state the window;
+# MU_DAYS_GRID is tested in Notebook 3 (WBS 3.35).
+MU_DAYS = 220
+MU_DAYS_GRID = (21, 42, 63, 126, 220)
+
 # Experiment settings, fixed before the main test (Project Brief, section 7).
 FEE = 0.005                                     # charged on value traded
 LAMBDA_GRID = (0.1, 1, 10, 20, 50)              # risk aversion, the paper's grid
@@ -100,6 +106,7 @@ FILES = {
     "daily_checks": "Daily Data Checks.csv",
     "benchmark_months": "Benchmark Months.parquet",
     "benchmark_results": "Benchmark Results.csv",
+    "window_diagnostic": "Markowitz Window Diagnostic.csv",
 }
 
 

@@ -73,10 +73,10 @@ def holding_returns(panel, universe):
 def historical_means(clean, dates, universe, days=None, scale=None):
     """Mean daily return over the `days` ending at each date, times `scale`.
 
-    The expected returns of classic Markowitz: the same 220-day window as the
-    covariance, on the same monthly scale.
+    The expected returns of classic Markowitz, on the covariance's monthly
+    scale. The window defaults to config.MU_DAYS (see WBS 3.35).
     """
-    days = days or config.COV_DAYS
+    days = days or config.MU_DAYS
     scale = scale or config.MONTH_DAYS
     rets = covariance.daily_returns(clean)[tickers_of(universe)]
     out = {}
