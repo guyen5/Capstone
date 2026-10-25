@@ -65,9 +65,10 @@ COV_RIDGE = 1e-6
 MONTH_DAYS = 21
 
 # Classic Markowitz expected returns: mean daily return over the last
-# MU_DAYS trading days, times 21. The paper does not state the window;
-# MU_DAYS_GRID is tested in Notebook 3 (WBS 3.35).
-MU_DAYS = 220
+# MU_DAYS trading days, times 21. The paper does not state the window.
+# Of the windows in MU_DAYS_GRID, 126 days comes closest to Table 3's
+# turnover (Notebook 3, section 10, WBS 3.35); 220 days traded a third as much.
+MU_DAYS = 126
 MU_DAYS_GRID = (21, 42, 63, 126, 220)
 
 # Experiment settings, fixed before the main test (Project Brief, section 7).
