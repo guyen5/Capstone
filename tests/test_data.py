@@ -1,4 +1,4 @@
-"""Tests for notebooks 1 to 3 on simulated prices.
+"""Tests for the data notebooks on simulated prices.
 
 Run from the repository root:
     python -m pytest tests
@@ -245,3 +245,15 @@ def test_covariances_pass_all_checks(clean):
     assert (variables.check_table(table, "Covariances")["status"] == "PASS").all()
     m = covariance.matrix(table, dates[0], "ETF_A")
     assert list(m.index) == config.ETF_A
+
+
+def test_backtest_on_simulated_data(clean, panel):
+    from src import backtest
+    returns = backtest.holding_returns(panel, "ETF_A")
+    assert len(returns) == 81
+    cov = backtest.covariance_lookup(covariance.build_covariances(clean, returns.index),
+                                     "ETF_A", "sample")
+    mu = backtest.historical_means(clean, returns.index, "ETF_A")
+    months, weights = backtest.run(backtest.mean_variance(mu, cov, 10), returns)
+    report = backtest.check_accounting(months, weights, returns)
+    assert (report["status"] == "PASS").all(), report

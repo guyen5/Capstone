@@ -17,6 +17,7 @@ def _v(table, column, label, kind, unit, meaning, formula="", lo=None, hi=None,
 
 D, M, W = "Daily Prices", "Monthly Data", "Training Windows"
 DF, DW, C = "Daily Features", "Daily Training Windows", "Covariances"
+B = "Benchmark Months"
 
 ENTRIES = [
     _v(D, "date", "Date", "date", "trading day", "NYSE trading day", code="cleaning.clean_prices"),
@@ -91,6 +92,18 @@ ENTRIES = [
     _v(C, "value", "Covariance", "float", "monthly return squared", "Covariance of the two ETFs' returns, daily estimate x 21", "from the 220 daily returns ending at the decision date", code="covariance.build_covariances"),
     _v(C, "shrinkage", "Shrinkage", "float", "0 to 1", "Ledoit-Wolf intensity toward the scaled identity; 0 for the sample method", lo=0, hi=1, code="covariance.ledoit_wolf"),
     _v(C, "window_start", "Window start", "date", "trading day", "First day of the 220-day return window", code="covariance.build_covariances"),
+
+    _v(B, "strategy", "Strategy", "text", "", "1/N, minimum variance or classic Markowitz", code="backtest.run"),
+    _v(B, "universe", "Universe", "text", "", "ETF_A or ETF_B", code="backtest.run"),
+    _v(B, "lam", "Risk aversion", "float", "", "lambda in the optimizer; empty for 1/N and minimum variance", lo=0, empty="1/N and minimum variance", code="backtest.mean_variance"),
+    _v(B, "date", "Decision date", "date", "month-end", "When the portfolio is chosen and traded", code="backtest.run"),
+    _v(B, "month", "Holding month", "text", "YYYY-MM", "Month the return is earned", code="backtest.run"),
+    _v(B, "gross", "Gross return", "float", "simple return", "Portfolio return before fees", "target weights x ETF returns", lo=-1, code="backtest.run"),
+    _v(B, "fee", "Fee", "float", "share of portfolio", "Trading cost charged at the decision date", "0.005 x sum |target - pre-trade weights|", lo=0, code="backtest.run"),
+    _v(B, "net", "Net return", "float", "simple return", "Return after the fee", "gross - fee", lo=-1, code="backtest.run"),
+    _v(B, "turnover", "Turnover", "float", "share of portfolio", "Half the value traded; a full switch from one ETF to another is 1", "sum |target - pre-trade weights| / 2", lo=0, hi=1, code="backtest.run"),
+    _v(B, "held", "ETFs held", "int", "count", "ETFs with a target weight above 0.0001%", lo=1, code="backtest.run"),
+    _v(B, "effective_n", "Effective number of ETFs", "float", "count", "How many equal holdings the portfolio is worth", "1 / sum of squared weights", lo=1, code="backtest.run"),
 ]
 
 

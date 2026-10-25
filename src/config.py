@@ -74,6 +74,11 @@ BOOTSTRAP_BLOCK_MONTHS = 3                      # months per resampled block
 SELECTION_PERIOD = ("2015-01", "2019-12")       # holding months used to choose settings
 SECOND_TEST_PERIOD = ("2011-01", "2019-12")     # robustness test period
 
+# Replication (Replication Spec). Table 3 turnover values are multiples of
+# 1/70, so results are also compared over the first 70 test months.
+PAPER_LAST_MONTH = "2025-10"
+RIDGE_ALPHAS = tuple(float(f"{a:.3g}") for a in [10 ** (k / 2) for k in range(-8, 7)])  # 1e-4 to 1e3, 15 values
+
 # Google Drive folders and file names.
 DRIVE_ROOT = Path("/content/drive/MyDrive/Capstone")
 FILES = {
@@ -93,6 +98,8 @@ FILES = {
     "covariances": "Covariances.parquet",
     "daily_info": "Daily Features Info.json",
     "daily_checks": "Daily Data Checks.csv",
+    "benchmark_months": "Benchmark Months.parquet",
+    "benchmark_results": "Benchmark Results.csv",
 }
 
 
