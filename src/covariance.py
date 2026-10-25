@@ -7,8 +7,8 @@ scaled to a monthly horizon (x 21 trading days):
   Wang and Hasuike (used by the replication);
 - ledoit_wolf: the sample covariance shrunk toward a scaled identity matrix
   with the data-chosen intensity of Ledoit and Wolf (2004), used by the
-  robust model. SPY and VTI move almost together, so the sample matrix is
-  close to singular, and shrinkage keeps it well conditioned.
+  robust model. SPY and VTI move almost together, which makes the sample
+  matrix poorly conditioned; shrinkage reduces this.
 
 Saved as one long table: date, universe, method, row, col, value, plus the
 shrinkage intensity of each Ledoit-Wolf estimate.

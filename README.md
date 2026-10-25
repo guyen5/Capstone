@@ -1,6 +1,6 @@
 # Reliability-Weighted Forecasts in Predict-then-Optimize Portfolios
 
-Does weighting each return forecast by its estimated reliability, through Black-Litterman inside the same Markowitz model, give a higher after-fee Sharpe ratio at every level of turnover than plain predict-then-optimize? The project first replicates the PTO results of Wang and Hasuike (2026) on their ETF universe, then makes that one change.
+Does weighting each forecast by its reliability (Black-Litterman) improve after-fee returns of predict-then-optimize portfolios? The project first replicates Wang and Hasuike (2026), then makes this one change.
 
 ## Notebooks
 
