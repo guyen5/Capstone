@@ -1,6 +1,6 @@
 """Download daily ETF prices from Yahoo Finance and freeze them (WBS 2.2).
 
-I download once and then only load the frozen copy. Yahoo recalculates
+The prices are downloaded once and then only the frozen copy is loaded. Yahoo recalculates
 adjusted prices after every dividend, so two downloads on different days
 never match exactly; the frozen file and its checksum keep every result
 reproducible.

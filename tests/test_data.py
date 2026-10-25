@@ -1,4 +1,4 @@
-"""Tests for notebooks 1 and 2 on simulated prices.
+"""Tests for notebooks 1 to 3 on simulated prices.
 
 Run from the repository root:
     python -m pytest tests
@@ -176,3 +176,72 @@ def test_old_file_names_are_renamed(raw, tmp_path):
     assert (dirs["archive"] / "monthly_panel_v1.parquet").exists()
     assert not list(dirs["raw"].glob("freeze_*.json"))
     download.rename_old_files(dirs)  # second run changes nothing
+
+
+# ---------------------------------------------------------------------------
+# Notebook 3: daily table, daily windows, covariances
+# ---------------------------------------------------------------------------
+
+from src import covariance  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def daily_table(clean):
+    return features.build_daily_table(clean)
+
+
+def test_daily_table_passes_all_checks(daily_table, clean, panel):
+    report = features.validate_daily(daily_table, clean, panel)
+    assert (report["status"] == "PASS").all(), report[report["status"] != "PASS"]
+    assert (variables.check_table(daily_table, "Daily Features")["status"] == "PASS").all()
+
+
+def test_daily_target_is_21_days_ahead(daily_table, clean):
+    px = clean.pivot(index="date", columns="ticker", values="adj_close")
+    row = daily_table[(daily_table["universe"] == "ETF_A")
+                      & (daily_table["ticker"] == "EEM")].iloc[500]
+    i = px.index.get_loc(row["date"])
+    assert row["label_date"] == px.index[i + 21]
+    assert row["fwd_return"] == pytest.approx(px["EEM"].iloc[i + 21] / px["EEM"].iloc[i] - 1)
+
+
+def test_daily_windows(daily_table):
+    for name in config.DAILY_WINDOWS:
+        cal = windows.daily_windows(daily_table, name)
+        assert len(cal) == 81
+        report = windows.check_daily_windows(cal, daily_table)
+        assert (report["status"] == "PASS").all(), report
+        assert (variables.check_table(cal, "Daily Training Windows")["status"] == "PASS").all()
+
+
+def test_daily_windows_leave_no_overlap(daily_table):
+    cal = windows.daily_windows(daily_table, "9+3")
+    step = cal.iloc[0]
+    fit, val, test = windows.daily_rows_for(daily_table, step, "ETF_A")
+    assert fit["label_date"].max() < val["date"].min()
+    assert val["label_date"].max() <= step["decision_date"]
+    assert len(test) == len(config.ETF_A) and test["month_end"].all()
+    # 9 + 3 months: about 12 months of trading days (simulated data has no holidays).
+    days = daily_table.loc[daily_table["universe"] == "ETF_A", "date"]
+    n = days[(days >= step["train_start"]) & (days <= step["train_end"])].nunique()
+    assert 240 <= n <= 265
+
+
+def test_ledoit_wolf_matches_sklearn(clean):
+    sk = pytest.importorskip("sklearn.covariance")
+    r = covariance.daily_returns(clean)[config.ETF_A].iloc[-220:]
+    mine, k = covariance.ledoit_wolf(r)
+    ref, k_ref = sk.ledoit_wolf(r.to_numpy())
+    assert k == pytest.approx(k_ref)
+    assert np.abs(mine - ref).max() < 1e-15
+
+
+def test_covariances_pass_all_checks(clean):
+    ends = features.month_ends(clean)
+    dates = ends[(ends >= "2019-06-01") & (ends <= "2020-06-30")]
+    table = covariance.build_covariances(clean, dates)
+    report = covariance.validate_covariances(table, clean)
+    assert (report["status"] == "PASS").all(), report[report["status"] != "PASS"]
+    assert (variables.check_table(table, "Covariances")["status"] == "PASS").all()
+    m = covariance.matrix(table, dates[0], "ETF_A")
+    assert list(m.index) == config.ETF_A

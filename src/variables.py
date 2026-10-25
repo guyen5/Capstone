@@ -1,7 +1,7 @@
-"""Definition of every column I save (WBS 2.5).
+"""Definition of every saved column (WBS 2.5).
 
-This list is the single source for what each variable means. Notebook 2
-checks every saved table against it with check_table(), and the Variables
+This list is the single source for what each variable means. Notebooks 2
+and 3 check every saved table against it with check_table(), and the Variables
 tab of the Data Specification sheet is generated from it, so the code and
 the documentation always agree.
 """
@@ -16,6 +16,7 @@ def _v(table, column, label, kind, unit, meaning, formula="", lo=None, hi=None,
 
 
 D, M, W = "Daily Prices", "Monthly Data", "Training Windows"
+DF, DW, C = "Daily Features", "Daily Training Windows", "Covariances"
 
 ENTRIES = [
     _v(D, "date", "Date", "date", "trading day", "NYSE trading day", code="cleaning.clean_prices"),
@@ -25,7 +26,7 @@ ENTRIES = [
     _v(D, "low", "Low", "float", "USD", "Lowest trade of the day, not adjusted", lo=0, code="download.download_prices"),
     _v(D, "close", "Close", "float", "USD", "Last trade of the day, not adjusted. Only used in quality checks", lo=0, code="download.download_prices"),
     _v(D, "adj_close", "Adjusted close", "float", "USD", "Close adjusted for dividends and splits. All returns and features use this", lo=0, code="download.download_prices"),
-    _v(D, "volume", "Volume", "float", "shares", "Shares traded that day", lo=0, empty="only on filled days (none in my data)", code="download.download_prices"),
+    _v(D, "volume", "Volume", "float", "shares", "Shares traded that day", lo=0, empty="only on filled days (none in the data)", code="download.download_prices"),
     _v(D, "dividends", "Dividend", "float", "USD per share", "Cash paid on the ex-dividend date, else 0", lo=0, code="download.download_prices"),
     _v(D, "splits", "Split", "float", "ratio", "Split ratio on split days, else 0", lo=0, code="download.download_prices"),
     _v(D, "capital_gains", "Capital gains", "float", "USD per share", "Capital gains paid that day, else 0", lo=0, code="download.download_prices"),
@@ -45,9 +46,9 @@ ENTRIES = [
     _v(M, "bollinger", "Bollinger width", "float", "share of price", "Recent volatility relative to price", "4 x std20 / SMA20", lo=0, hi=2, code="features._one_ticker_features"),
     _v(M, "volume_bias", "Volume bias", "float", "ratio", "Trading volume relative to its 10-day average", "V / SMA10(V) - 1, set to 0 on zero-volume days", lo=-1, code="features._one_ticker_features"),
     _v(M, "volume_filled", "Volume filled", "bool", "", "Volume bias was set to 0 because nothing traded that day", code="features.build_panel"),
-    _v(M, "next_return", "Next-month return", "float", "simple return", "Label A: return over the holding month. Model A target and portfolio return", "P next month-end / P this month-end - 1", lo=-1, empty="latest month only", code="features._universe_rows"),
-    _v(M, "next_rank", "Next-month rank", "int", "rank", "Rank of next-month return within the universe, 1 = best", lo=1, hi=10, empty="latest month only", code="features._universe_rows"),
-    _v(M, "top3", "Top 3", "int", "0 or 1", "Label B: 1 if the ETF finishes in next month's top 3. Model B target", "1 if next rank <= 3", lo=0, hi=1, empty="latest month only", code="features.build_panel"),
+    _v(M, "next_return", "Next-month return", "float", "simple return", "Return over the holding month. Portfolio return; minus the universe average, it is the monthly forecast target", "P next month-end / P this month-end - 1", lo=-1, empty="latest month only", code="features._universe_rows"),
+    _v(M, "next_rank", "Next-month rank", "int", "rank", "Rank of next-month return within the universe, 1 = best. Kept from the earlier design", lo=1, hi=10, empty="latest month only", code="features._universe_rows"),
+    _v(M, "top3", "Top 3", "int", "0 or 1", "1 if the ETF finishes in next month's top 3. Kept from the earlier design; not used in the main test", "1 if next rank <= 3", lo=0, hi=1, empty="latest month only", code="features.build_panel"),
 
     _v(W, "month", "Test month", "text", "YYYY-MM", "Month being predicted", code="windows.training_windows"),
     _v(W, "decision_date", "Decision date", "date", "month-end", "When the model is refit and predicts", code="windows.training_windows"),
@@ -55,7 +56,41 @@ ENTRIES = [
     _v(W, "train_end", "Training end", "date", "month-end", "Last month in the training window, always before the decision date", code="windows.training_windows"),
     _v(W, "validation_start", "Validation start", "date", "month-end", "First of the 12 validation months at the end of the window", code="windows.training_windows"),
     _v(W, "train_months", "Training months", "int", "months", "Months in the window, validation included", lo=1, code="windows.training_windows"),
-    _v(W, "window", "Window", "text", "", "growing (primary), 36 or 60 months (robustness)", code="windows.training_windows"),
+    _v(W, "window", "Window", "text", "", "growing, 36 or 60 months (for models fitted on the monthly table)", code="windows.training_windows"),
+    _v(DF, "date", "Date", "date", "trading day", "Trading day; features are measured at its close", code="features.build_daily_table"),
+    _v(DF, "universe", "Universe", "text", "", "ETF_A (main, 8 ETFs) or ETF_B (robustness, 10 ETFs)", code="features.build_daily_table"),
+    _v(DF, "ticker", "Ticker", "text", "", "ETF symbol; one-hot encoded as a model input", code="features.build_daily_table"),
+    _v(DF, "month_end", "Month-end", "bool", "", "True on the last trading day of a month, the decision dates", code="features.build_daily_table"),
+    _v(DF, "momentum", "Momentum", "float", "log return", "Return over the last month", "ln(P today / P 21 days ago)", lo=-2, hi=2, code="features._one_ticker_features"),
+    _v(DF, "trend", "Trend", "float", "ratio", "10-day average relative to 50-day average", "SMA10 / SMA50 - 1", lo=-1, hi=1, code="features._one_ticker_features"),
+    _v(DF, "price_bias", "Price bias", "float", "ratio", "Price relative to its 10-day average", "P / SMA10 - 1", lo=-1, hi=1, code="features._one_ticker_features"),
+    _v(DF, "rsi", "RSI", "float", "0 to 100", "Balance of recent gains and losses", "100 - 100 / (1 + avg gain / avg loss), Wilder smoothing, 14 days", lo=0, hi=100, code="features.wilder_rsi"),
+    _v(DF, "macd", "MACD", "float", "share of price", "Whether short-term momentum is speeding up or slowing", "(MACD line - signal line) / P, with EMA 12, 26, 9", lo=-1, hi=1, code="features._one_ticker_features"),
+    _v(DF, "bollinger", "Bollinger width", "float", "share of price", "Recent volatility relative to price", "4 x std20 / SMA20", lo=0, hi=2, code="features._one_ticker_features"),
+    _v(DF, "volume_bias", "Volume bias", "float", "ratio", "Trading volume relative to its 10-day average", "V / SMA10(V) - 1, set to 0 on zero-volume days", lo=-1, code="features._one_ticker_features"),
+    _v(DF, "volume_filled", "Volume filled", "bool", "", "Volume bias was set to 0 because nothing traded that day", code="features.build_daily_table"),
+    _v(DF, "fwd_return", "Forward return", "float", "simple return", "Return over the next 21 trading days", "P in 21 trading days / P today - 1", lo=-1, empty="last 21 trading days only", code="features.build_daily_table"),
+    _v(DF, "fwd_rel_return", "Forward relative return", "float", "simple return", "Forward return minus the universe average on the same days. Forecast target", "fwd_return - mean of fwd_return across the universe", empty="last 21 trading days only", code="features.build_daily_table"),
+    _v(DF, "label_date", "Label date", "date", "trading day", "Day the forward return becomes known; a row trains a model only from this day on", "trading day 21 days after date", empty="last 21 trading days only", code="features.build_daily_table"),
+
+    _v(DW, "month", "Test month", "text", "YYYY-MM", "Month being predicted", code="windows.daily_windows"),
+    _v(DW, "decision_date", "Decision date", "date", "month-end", "When the model is refit and predicts", code="windows.daily_windows"),
+    _v(DW, "train_start", "Training start", "date", "trading day", "First daily row in the window", code="windows.daily_windows"),
+    _v(DW, "fit_end", "Fit end", "date", "trading day", "Last row used for fitting during tuning; its target is known before validation starts", code="windows.daily_windows"),
+    _v(DW, "validation_start", "Validation start", "date", "trading day", "First row of the validation slice", code="windows.daily_windows"),
+    _v(DW, "train_end", "Training end", "date", "trading day", "Newest row whose target is known on the decision date", code="windows.daily_windows"),
+    _v(DW, "train_months", "Window months", "int", "months", "Length of the whole window, validation included", lo=1, code="windows.daily_windows"),
+    _v(DW, "validation_months", "Validation months", "int", "months", "Length of the validation slice", lo=1, code="windows.daily_windows"),
+    _v(DW, "window", "Window", "text", "", "9+3 (Wang and Hasuike), 36 or 60 months; the main test uses one chosen on 2015 to 2019", code="windows.daily_windows"),
+
+    _v(C, "date", "Decision date", "date", "month-end", "Month-end at which the matrix is estimated", code="covariance.build_covariances"),
+    _v(C, "universe", "Universe", "text", "", "ETF_A or ETF_B", code="covariance.build_covariances"),
+    _v(C, "method", "Method", "text", "", "sample (plus 1e-6 on the diagonal, as in the paper) or ledoit_wolf", code="covariance.build_covariances"),
+    _v(C, "row", "Row ETF", "text", "", "ETF of the matrix row", code="covariance.build_covariances"),
+    _v(C, "col", "Column ETF", "text", "", "ETF of the matrix column", code="covariance.build_covariances"),
+    _v(C, "value", "Covariance", "float", "monthly return squared", "Covariance of the two ETFs' returns, daily estimate x 21", "from the 220 daily returns ending at the decision date", code="covariance.build_covariances"),
+    _v(C, "shrinkage", "Shrinkage", "float", "0 to 1", "Ledoit-Wolf intensity toward the scaled identity; 0 for the sample method", lo=0, hi=1, code="covariance.ledoit_wolf"),
+    _v(C, "window_start", "Window start", "date", "trading day", "First day of the 220-day return window", code="covariance.build_covariances"),
 ]
 
 

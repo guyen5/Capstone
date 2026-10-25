@@ -275,3 +275,132 @@ def validate_panel(panel, clean, n_truncation_tests=8, seed=0):
                        f"data cut at that date; largest difference {worst:.1e}"))
 
     return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------
+# Daily table (Notebook 3, WBS 3.2)
+#
+# Wang and Hasuike retrain on 9 months of data. With one row per ETF per
+# month that is only 72 rows for ETF_A, so the replication trains on daily
+# rows: every trading day's features, paired with the return over the next
+# 21 trading days. Neighbouring rows overlap (their targets share 20 of 21
+# days), so the training windows in windows.py leave a gap between training
+# and validation rows, and the bootstrap resamples whole months.
+# ---------------------------------------------------------------------------
+
+def _universe_daily_rows(daily, prices, universe, tickers, horizon):
+    """Daily rows for one universe: features at d, target from d to d + horizon."""
+    px = prices[tickers]
+    calendar = px.index
+
+    # Forward return over the next `horizon` trading days, and the day on
+    # which it becomes known.
+    fwd = px.shift(-horizon) / px - 1
+    label_date = pd.Series(calendar, index=calendar).shift(-horizon)
+
+    # Return relative to the universe average on the same days. With
+    # weights summing to one, only these differences affect a portfolio.
+    rel = fwd.sub(fwd.mean(axis=1), axis=0)
+
+    long = pd.DataFrame({"fwd_return": fwd.stack(future_stack=True),
+                         "fwd_rel_return": rel.stack(future_stack=True)})
+    long.index.names = ["date", "ticker"]
+    long = long.reset_index()
+    long["label_date"] = long["date"].map(label_date)
+
+    feats = daily[daily["ticker"].isin(tickers)]
+    rows = feats.merge(long, on=["date", "ticker"], how="left")
+    rows.insert(1, "universe", universe)
+    return rows
+
+
+def build_daily_table(clean, daily=None, horizon=None):
+    """Build Daily Features: one row per universe, ETF and trading day.
+
+    Columns: date, universe, ticker, month_end, the seven features,
+    volume_filled, fwd_return, fwd_rel_return, label_date.
+    Rows start at PANEL_START, so every indicator has a full history.
+    The last `horizon` days have features but no target yet.
+    """
+    horizon = horizon or config.FORWARD_DAYS
+    daily = daily if daily is not None else daily_features(clean)
+    prices = clean.pivot(index="date", columns="ticker", values="adj_close").sort_index()
+
+    parts = [_universe_daily_rows(daily, prices, "ETF_A", config.ETF_A, horizon),
+             _universe_daily_rows(daily, prices, "ETF_B", config.ETF_B, horizon)]
+    table = pd.concat(parts, ignore_index=True)
+    table = table[table["date"] >= pd.Timestamp(config.PANEL_START)]
+
+    ends = month_ends(clean)
+    table.insert(3, "month_end", table["date"].isin(ends))
+
+    # Same rule as the monthly table for days with no trading.
+    table["volume_filled"] = table["volume_bias"].isna()
+    table["volume_bias"] = table["volume_bias"].fillna(0.0)
+
+    order = (["date", "universe", "ticker", "month_end"] + config.FEATURES
+             + ["volume_filled", "fwd_return", "fwd_rel_return", "label_date"])
+    table = table[order].sort_values(["universe", "date", "ticker"])
+    return table.reset_index(drop=True)
+
+
+def validate_daily(table, clean, panel=None, n_samples=200, seed=0, horizon=None):
+    """Checks on the daily table. Returns a report DataFrame.
+
+    The features are the same function as in the monthly table, which is
+    already tested for look-ahead, so here the checks focus on the target:
+    it is recomputed independently, its label date is always later than the
+    row date, and at month-ends the features equal the monthly table.
+    """
+    horizon = horizon or config.FORWARD_DAYS
+    rows = []
+    sizes = {"ETF_A": len(config.ETF_A), "ETF_B": len(config.ETF_B)}
+    n_days = table["date"].nunique()
+    for uni, k in sizes.items():
+        n = int((table["universe"] == uni).sum())
+        rows.append(_check(f"row count {uni}", n == n_days * k,
+                           f"{n:,} rows = {n_days:,} trading days x {k} ETFs"))
+
+    dupes = int(table.duplicated(["date", "universe", "ticker"]).sum())
+    rows.append(_check("unique rows", dupes == 0, f"{dupes} duplicate keys"))
+
+    n_na = int(table[config.FEATURES].isna().sum().sum())
+    rows.append(_check("features complete", n_na == 0, f"{n_na} missing feature values"))
+
+    labeled = table[table["fwd_return"].notna()]
+    unlabeled_days = table.loc[table["fwd_return"].isna(), "date"].nunique()
+    rows.append(_check("newest days unlabeled", unlabeled_days == horizon,
+                       f"the last {unlabeled_days} trading days have no target yet"))
+
+    later = (labeled["label_date"] > labeled["date"]).all()
+    rows.append(_check("label after row date", bool(later),
+                       "every target becomes known after its row date"))
+
+    # Relative returns sum to zero across each universe on each day.
+    sums = labeled.groupby(["universe", "date"])["fwd_rel_return"].sum().abs().max()
+    rows.append(_check("relative returns sum to 0", sums < 1e-12,
+                       f"largest absolute daily sum {sums:.1e}"))
+
+    # Independent recomputation of the target from the price table.
+    px = clean.pivot(index="date", columns="ticker", values="adj_close").sort_index()
+    cal = px.index
+    sample = labeled.sample(min(n_samples, len(labeled)), random_state=seed)
+    errs = []
+    for _, r in sample.iterrows():
+        i = cal.get_loc(r["date"])
+        errs.append(abs(px.iat[i + horizon, px.columns.get_loc(r["ticker"])]
+                        / px.iat[i, px.columns.get_loc(r["ticker"])] - 1 - r["fwd_return"]))
+        if cal[i + horizon] != r["label_date"]:
+            errs.append(np.inf)
+    rows.append(_check("target recomputed", max(errs) < 1e-12,
+                       f"{len(sample)} random rows, largest difference {max(errs):.1e}"))
+
+    if panel is not None:
+        me = table[table["month_end"]].set_index(["date", "universe", "ticker"])[config.FEATURES]
+        pm = panel.set_index(["date", "universe", "ticker"])[config.FEATURES]
+        common = me.index.intersection(pm.index)
+        diff = float((me.loc[common] - pm.loc[common]).abs().max().max())
+        rows.append(_check("month-ends match Monthly Data", diff < 1e-12 and len(common) == len(pm),
+                           f"{len(common):,} month-end rows, largest difference {diff:.1e}"))
+
+    return pd.DataFrame(rows)
