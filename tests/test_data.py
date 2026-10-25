@@ -257,3 +257,11 @@ def test_backtest_on_simulated_data(clean, panel):
     months, weights = backtest.run(backtest.mean_variance(mu, cov, 10), returns)
     report = backtest.check_accounting(months, weights, returns)
     assert (report["status"] == "PASS").all(), report
+
+
+def test_forecasts_on_simulated_data(daily_table):
+    from src import forecast
+    cal = windows.daily_windows(daily_table, "9+3").iloc[:6]
+    f = forecast.build_forecasts(daily_table, cal, "ETF_A", config.ETF_A)
+    report = forecast.check_forecasts(f, daily_table, cal, "ETF_A", config.ETF_A)
+    assert (report["status"] == "PASS").all(), report

@@ -84,7 +84,10 @@ SECOND_TEST_PERIOD = ("2011-01", "2019-12")     # robustness test period
 # Replication (Replication Spec). Table 3 turnover values are multiples of
 # 1/70, so results are also compared over the first 70 test months.
 PAPER_LAST_MONTH = "2025-10"
-RIDGE_ALPHAS = tuple(float(f"{a:.3g}") for a in [10 ** (k / 2) for k in range(-8, 7)])  # 1e-4 to 1e3, 15 values
+# Ridge penalties tried for the PTO forecasts, 15 values from 0.1 to 1e6.
+# With about 1,800 standardized daily rows, 0.1 is almost unpenalized and
+# 1e6 shrinks the feature coefficients to almost zero.
+RIDGE_ALPHAS = tuple(float(f"{10 ** (k / 2):.3g}") for k in range(-2, 13))
 
 # Google Drive folders and file names.
 DRIVE_ROOT = Path("/content/drive/MyDrive/Capstone")
@@ -108,6 +111,10 @@ FILES = {
     "benchmark_months": "Benchmark Months.parquet",
     "benchmark_results": "Benchmark Results.csv",
     "window_diagnostic": "Markowitz Window Diagnostic.csv",
+    "forecasts": "PTO Forecasts.parquet",
+    "replication_months": "Replication Months.parquet",
+    "replication_results": "Replication Results.csv",
+    "replication_checks": "Replication Checks.csv",
 }
 
 

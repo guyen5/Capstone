@@ -61,3 +61,27 @@ def test_risk_aversion_spreads_the_portfolio():
     assert held[0] <= held[1]
     vols = [np.sqrt(w @ sigma @ w) for w in (optimizer.solve(mu, sigma, lam) for lam in (0.1, 1, 10, 50))]
     assert all(x >= y - 1e-12 for x, y in zip(vols, vols[1:]))
+
+
+def test_ridge_matches_sklearn():
+    from sklearn.linear_model import Ridge
+    from src import forecast
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(300, 10))
+    y = x @ rng.normal(size=10) * 0.01 + rng.normal(size=300) * 0.05
+    for alpha in (0.1, 100.0, 1e5):
+        b0, b = forecast.ridge_fit(x, y, [alpha])[0]
+        sk = Ridge(alpha=alpha).fit(x, y)
+        assert b0 == pytest.approx(sk.intercept_, abs=1e-10)
+        assert b == pytest.approx(sk.coef_, abs=1e-10)
+
+
+def test_large_penalty_gives_equal_forecasts():
+    """With a huge penalty every ETF gets the same forecast, the mean return."""
+    from src import forecast
+    rng = np.random.default_rng(1)
+    x = rng.normal(size=(200, 5))
+    y = rng.normal(0.01, 0.05, 200)
+    b0, b = forecast.ridge_fit(x, y, [1e12])[0]
+    assert np.abs(b).max() < 1e-9
+    assert b0 == pytest.approx(y.mean())

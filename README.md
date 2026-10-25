@@ -8,7 +8,8 @@ Does weighting each forecast by its reliability (Black-Litterman) improve after-
 |---|---|---|
 | 1 Data Download | 2.2, 2.3 | Raw Prices, Daily Prices, Quality Report |
 | 2 Features and Labels | 2.4, 2.5 | Monthly Data, Training Windows (monthly), Variables |
-| 3 Backtest Engine | 3.2, 3.3 | Daily Features, Daily Training Windows, Covariances, Benchmark Results |
+| 3 Backtest Engine | 3.2, 3.3, 3.35 | Daily Features, Daily Training Windows, Covariances, Benchmark Results |
+| 4 Replication Run | 3.4 | PTO Forecasts, Replication Results |
 
 ## Code
 
@@ -22,6 +23,7 @@ Does weighting each forecast by its reliability (Black-Litterman) improve after-
 | `covariance.py` | Sample and Ledoit-Wolf covariance at each decision date |
 | `optimizer.py` | The mean-variance problem with a trading penalty |
 | `backtest.py` | Monthly loop: drift, turnover, fees, benchmarks, metrics |
+| `forecast.py` | Ridge forecasts for plain PTO |
 | `variables.py` | Definition of every saved column |
 
 Data lives on Google Drive in `Capstone/data`. Open a notebook in Colab and run all cells. The tests run on simulated prices with `python -m pytest tests`.

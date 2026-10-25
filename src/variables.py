@@ -1,7 +1,7 @@
 """Definition of every saved column (WBS 2.5).
 
-This list is the single source for what each variable means. Notebooks 2
-and 3 check every saved table against it with check_table(), and the Variables
+This list is the single source for what each variable means. The notebooks
+check every saved table against it with check_table(), and the Variables
 tab of the Data Specification sheet is generated from it, so the code and
 the documentation always agree.
 """
@@ -18,6 +18,7 @@ def _v(table, column, label, kind, unit, meaning, formula="", lo=None, hi=None,
 D, M, W = "Daily Prices", "Monthly Data", "Training Windows"
 DF, DW, C = "Daily Features", "Daily Training Windows", "Covariances"
 B = "Benchmark Months"
+F, R = "PTO Forecasts", "Replication Months"
 
 ENTRIES = [
     _v(D, "date", "Date", "date", "trading day", "NYSE trading day", code="cleaning.clean_prices"),
@@ -104,7 +105,23 @@ ENTRIES = [
     _v(B, "turnover", "Turnover", "float", "share of portfolio", "Half the value traded; a full switch from one ETF to another is 1", "sum |target - pre-trade weights| / 2", lo=0, hi=1, code="backtest.run"),
     _v(B, "held", "ETFs held", "int", "count", "ETFs with a target weight above 0.0001%", lo=1, code="backtest.run"),
     _v(B, "effective_n", "Effective number of ETFs", "float", "count", "How many equal holdings the portfolio is worth", "1 / sum of squared weights", lo=1, code="backtest.run"),
+
+    _v(F, "date", "Decision date", "date", "month-end", "When the model is refit and predicts", code="forecast.build_forecasts"),
+    _v(F, "month", "Holding month", "text", "YYYY-MM", "Month being predicted", code="forecast.build_forecasts"),
+    _v(F, "universe", "Universe", "text", "", "ETF_A or ETF_B", code="forecast.build_forecasts"),
+    _v(F, "ticker", "Ticker", "text", "", "ETF symbol", code="forecast.build_forecasts"),
+    _v(F, "forecast", "Forecast", "float", "simple return", "Predicted return over the holding month; the expected return of plain PTO", "ridge on daily rows of the 9+3 window", code="forecast.forecast_month"),
+    _v(F, "alpha", "Ridge penalty", "float", "", "Penalty chosen on the validation slice", lo=0, code="forecast.forecast_month"),
+    _v(F, "validation_mse", "Validation error", "float", "squared return", "Mean squared error of the chosen model on the validation slice", lo=0, code="forecast.forecast_month"),
+    _v(F, "fit_rows", "Fit rows", "int", "rows", "Daily rows fitted while tuning", lo=1, code="forecast.forecast_month"),
+    _v(F, "validation_rows", "Validation rows", "int", "rows", "Daily rows in the validation slice", lo=1, code="forecast.forecast_month"),
 ]
+
+# Replication Months has the same columns as Benchmark Months.
+_R_MEANING = {"strategy": "Classic Markowitz or plain PTO", "lam": "lambda in the optimizer"}
+ENTRIES += [dict(e, table=R, meaning=_R_MEANING.get(e["column"], e["meaning"]),
+                 empty="never" if e["column"] == "lam" else e["empty"])
+            for e in ENTRIES if e["table"] == B]
 
 
 def table_entries(table):
@@ -148,9 +165,11 @@ def check_table(df, table):
             problems.append(f"{n_na} empty values")
         values = s.dropna()
         if e["kind"] in ("float", "int") and len(values):
-            if e["lo"] is not None and values.min() < e["lo"]:
+            # A tolerance of 1e-9 absorbs rounding, e.g. a full switch whose
+            # turnover comes out as 1.0000000000000002.
+            if e["lo"] is not None and values.min() < e["lo"] - 1e-9:
                 problems.append(f"min {values.min():.4g} below {e['lo']}")
-            if e["hi"] is not None and values.max() > e["hi"]:
+            if e["hi"] is not None and values.max() > e["hi"] + 1e-9:
                 problems.append(f"max {values.max():.4g} above {e['hi']}")
         detail = "; ".join(problems) if problems else (
             f"{e['kind']}, {n_na} empty" + (
